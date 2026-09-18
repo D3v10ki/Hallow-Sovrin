@@ -50,20 +50,21 @@ public final class VoidGhostRenderer {
     private static final class Ghost {
         final int playerId;
         final Vec3d pos;
-        final float bodyYaw, headYaw, pitch;
+        final float bodyYaw, headYaw, pitch, stretch;
         final long spawnMs, lifeMs;
         final float startAlpha;
-        Ghost(int playerId, Vec3d pos, float bodyYaw, float headYaw, float pitch,
+        Ghost(int playerId, Vec3d pos, float bodyYaw, float headYaw, float pitch, float stretch,
               long spawnMs, long lifeMs, float startAlpha) {
             this.playerId = playerId; this.pos = pos;
-            this.bodyYaw = bodyYaw; this.headYaw = headYaw; this.pitch = pitch;
+            this.bodyYaw = bodyYaw; this.headYaw = headYaw; this.pitch = pitch; this.stretch = stretch;
             this.spawnMs = spawnMs; this.lifeMs = lifeMs; this.startAlpha = startAlpha;
         }
     }
 
-    /** Client: lay down {@code count} ghosts along from -> to (call on the render thread). */
+    /** Client: lay down {@code count} ghosts along from -> to (call on the render thread). {@code stretch}
+     *  &gt; 1 elongates each ghost along its facing/motion axis for the Umbral Dash streak look. */
     public static void addTrail(int playerId, Vec3d from, Vec3d to, int count,
-                                float bodyYaw, float headYaw, float pitch, int lifeTicks) {
+                                float bodyYaw, float headYaw, float pitch, float stretch, int lifeTicks) {
         long now = System.currentTimeMillis();
         long baseLife = Math.max(150L, lifeTicks * 50L); // ~0.25-0.4s per the spec
         int n = Math.max(1, count);
@@ -72,7 +73,7 @@ public final class VoidGhostRenderer {
             Vec3d p = from.add(to.subtract(from).multiply(f));
             float startAlpha = Math.min(0.75f, 0.22f + 0.5f * f); // nearer destination = brighter
             long life = baseLife + (long) (i * 22);              // slight stagger
-            GHOSTS.add(new Ghost(playerId, p, bodyYaw, headYaw, pitch, now, life, startAlpha));
+            GHOSTS.add(new Ghost(playerId, p, bodyYaw, headYaw, pitch, stretch, now, life, startAlpha));
         }
         if (GHOSTS.size() > 256) GHOSTS.subList(0, GHOSTS.size() - 256).clear(); // safety cap
     }
@@ -117,6 +118,7 @@ public final class VoidGhostRenderer {
             matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180f - g.bodyYaw));
             matrices.scale(-1f, -1f, 1f);
             matrices.scale(0.9375f, 0.9375f, 0.9375f);
+            if (g.stretch != 1f) matrices.scale(1f, 1f, g.stretch); // elongate along facing (dash streak)
             matrices.translate(0f, -1.501f, 0f);
             VertexConsumer vc = imm.getBuffer(RenderLayer.getEntityTranslucent(skin));
             model.render(matrices, vc, LightmapTextureManager.MAX_LIGHT_COORDINATE,

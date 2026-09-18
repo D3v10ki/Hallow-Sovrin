@@ -28,6 +28,8 @@ public final class HSNet {
     public static final Identifier DOMAIN_STATE = id("domain_state");
     public static final Identifier TELEPORT_TRAIL = id("teleport_trail");
     public static final Identifier FLOOR_RIPPLE = id("floor_ripple");
+    public static final Identifier WARD_STATE = id("ward_state");
+    public static final Identifier WARD_IMPACT = id("ward_impact");
 
     // Client -> Server
     public static final Identifier SELECT_CLASS = id("select_class");
@@ -108,7 +110,8 @@ public final class HSNet {
      * so the trail is laid down progressively as it travels.
      */
     public static void sendTrail(ServerPlayerEntity caster, Vec3d from, Vec3d to, int count,
-                                 float bodyYaw, float headYaw, float pitch, int lifeTicks) {
+                                 float bodyYaw, float headYaw, float pitch, float stretch,
+                                 boolean rupture, int lifeTicks) {
         Set<ServerPlayerEntity> recipients = new HashSet<>(PlayerLookup.tracking(caster));
         recipients.add(caster);
         for (ServerPlayerEntity p : recipients) {
@@ -118,6 +121,8 @@ public final class HSNet {
             buf.writeDouble(to.x);   buf.writeDouble(to.y);   buf.writeDouble(to.z);
             buf.writeInt(count);
             buf.writeFloat(bodyYaw); buf.writeFloat(headYaw); buf.writeFloat(pitch);
+            buf.writeFloat(stretch);       // >1 elongates ghosts along the motion axis (dash streak)
+            buf.writeBoolean(rupture);     // spawn shockwave rings at both ends (Blink only)
             buf.writeInt(lifeTicks);
             ServerPlayNetworking.send(p, TELEPORT_TRAIL, buf);
         }
@@ -133,6 +138,32 @@ public final class HSNet {
             buf.writeDouble(worldX);
             buf.writeDouble(worldZ);
             ServerPlayNetworking.send(p, FLOOR_RIPPLE, buf);
+        }
+    }
+
+    /** Tell nearby clients a player's Void Ward dome is (re)active for durationTicks. */
+    public static void sendWard(ServerPlayerEntity caster, int durationTicks) {
+        Set<ServerPlayerEntity> recipients = new HashSet<>(PlayerLookup.tracking(caster));
+        recipients.add(caster);
+        for (ServerPlayerEntity p : recipients) {
+            PacketByteBuf buf = PacketByteBufs.create();
+            buf.writeInt(caster.getId());
+            buf.writeInt(durationTicks);
+            ServerPlayNetworking.send(p, WARD_STATE, buf);
+        }
+    }
+
+    /** Tell nearby clients a melee hit landed on a warded player's dome from unit direction dir. */
+    public static void sendWardImpact(ServerPlayerEntity warded, Vec3d dir) {
+        Set<ServerPlayerEntity> recipients = new HashSet<>(PlayerLookup.tracking(warded));
+        recipients.add(warded);
+        for (ServerPlayerEntity p : recipients) {
+            PacketByteBuf buf = PacketByteBufs.create();
+            buf.writeInt(warded.getId());
+            buf.writeFloat((float) dir.x);
+            buf.writeFloat((float) dir.y);
+            buf.writeFloat((float) dir.z);
+            ServerPlayNetworking.send(p, WARD_IMPACT, buf);
         }
     }
 }

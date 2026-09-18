@@ -8,11 +8,15 @@ import com.hollowsovereign.entity.HSEntities;
 import com.hollowsovereign.leveling.Leveling;
 import com.hollowsovereign.net.HSNet;
 import com.hollowsovereign.particle.HSParticles;
+import com.hollowsovereign.ability.VoidWeaver;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityCombatEvents;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +43,18 @@ public class HollowSovereign implements ModInitializer {
             if (entity instanceof ServerPlayerEntity player) {
                 Leveling.awardKillXp(player, killed);
             }
+        });
+
+        // Void Ward: when a warded player is meleed, root the attacker + flare the dome (real on-hit
+        // trigger, replacing the old proximity approximation). We never cancel — RESISTANCE mitigates.
+        ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
+            if (entity instanceof ServerPlayerEntity victim && VoidWeaver.isWardActive(victim)
+                    && source.getAttacker() instanceof LivingEntity attacker
+                    && !(attacker instanceof PlayerEntity)
+                    && attacker.squaredDistanceTo(victim) <= 3.5 * 3.5) {
+                VoidWeaver.wardStruck(victim, attacker);
+            }
+            return true;
         });
 
         // On join: push current progression to the client, and prompt class select if needed.

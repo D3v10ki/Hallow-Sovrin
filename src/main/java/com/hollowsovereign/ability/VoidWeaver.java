@@ -148,8 +148,9 @@ public final class VoidWeaver {
         player.networkHandler.requestTeleport(dest.x, dest.y, dest.z, player.getYaw(), player.getPitch());
         player.fallDistance = 0f;
 
-        // Afterimage: 5 fading ghosts pre-spaced along the whole hop (the teleport itself stays instant).
-        HSNet.sendTrail(player, fromFeet, dest, 5, bodyYaw, headYaw, pitch, 8);
+        // Afterimage: fading ghosts pre-spaced along the whole hop (the teleport itself stays instant),
+        // plus a rupture shockwave ring at both the departure and arrival points.
+        HSNet.sendTrail(player, fromFeet, dest, 7, bodyYaw, headYaw, pitch, 1.0f, true, 8);
 
         Vec3d to = dest.add(0, 1.0, 0);
         VoidFx.rift(world, to, 2.4, 30);
@@ -211,8 +212,8 @@ public final class VoidWeaver {
             }
 
             Vec3d now = owner.getPos();
-            // one ghost per tick along the segment just travelled = a progressive trail
-            HSNet.sendTrail(owner, prev, now, 1, owner.bodyYaw, owner.headYaw, owner.getPitch(), 7);
+            // one stretched ghost per tick along the segment just travelled = a progressive motion streak
+            HSNet.sendTrail(owner, prev, now, 1, owner.bodyYaw, owner.headYaw, owner.getPitch(), 1.6f, false, 7);
             VoidFx.trail(world, prev.add(0, 1.0, 0), now.add(0, 1.0, 0), 3);
             prev = now;
             return ++age < LIFE;
@@ -223,38 +224,39 @@ public final class VoidWeaver {
 
     /** A short personal barrier: strong damage reduction while up, and any enemy that presses into
      *  melee range is rooted + slowed — punishing attacking into it. Simple particle shell for now. */
+    /** Players with an active Void Ward: UUID -> world-tick the ward ends. Read by the damage event. */
+    public static final Map<UUID, Long> ACTIVE_WARDS = new HashMap<>();
+    private static final int WARD_TICKS = 100;             // 5s
+
     private static int voidWard(ServerWorld world, ServerPlayerEntity player) {
-        player.addStatusEffect(new StatusEffectInstance(StatusEffects.RESISTANCE, 100, 1, false, true)); // -40% dmg
+        player.addStatusEffect(new StatusEffectInstance(StatusEffects.RESISTANCE, WARD_TICKS, 1, false, true)); // -40% dmg
+        ACTIVE_WARDS.put(player.getUuid(), world.getTime() + WARD_TICKS);
+        HSNet.sendWard(player, WARD_TICKS);                // client draws the emissive dome
         play(world, player.getPos(), SoundEvents.BLOCK_CONDUIT_ACTIVATE, 0.8f, 1.4f);
         play(world, player.getPos(), SoundEvents.BLOCK_BEACON_ACTIVATE, 0.7f, 1.6f);
-        HSEffects.add(world, new WardEffect(player));
         return 3;
     }
 
-    private static final class WardEffect implements HSEffects.Effect {
-        private final ServerPlayerEntity owner;
-        private int age = 0;
-        private static final int LIFE = 100;               // 5s, matches the RESISTANCE duration
-        private static final double R = 2.3;                // melee-punish radius
-        WardEffect(ServerPlayerEntity owner) { this.owner = owner; }
+    /** Whether this player currently has an active ward (checked by the on-hit damage event). */
+    public static boolean isWardActive(ServerPlayerEntity p) {
+        Long end = ACTIVE_WARDS.get(p.getUuid());
+        return end != null && p.getServerWorld().getTime() < end;
+    }
 
-        @Override public boolean tick(ServerWorld world) {
-            if (!owner.isAlive()) return false;
-            for (LivingEntity e : enemiesNear(world, owner.getPos().add(0, 1, 0), R, owner)) {
-                e.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 12, 4, false, false));
-                e.setVelocity(0, Math.min(0, e.getVelocity().y), 0);   // root pulse
-                e.velocityModified = true;
-            }
-            // simple translucent shell: three slowly rotating bands of void motes around the caster
-            Vec3d c = owner.getPos().add(0, 1.0, 0);
-            double phase = age * 0.25;
-            for (int i = 0; i < 3; i++) {
-                double lat = (i - 1) * 0.8;
-                double rr = Math.sqrt(Math.max(0.1, 1.6 - lat * lat));
-                VoidFx.dustRing(world, VoidFx.PURPLE, 1.1f, c.add(0, lat, 0), rr, 12, phase + i);
-            }
-            return ++age < LIFE;
-        }
+    /**
+     * Real on-hit response (called from {@code ServerLivingEntityEvents.ALLOW_DAMAGE}): when a warded
+     * player is struck in melee, root + slow the attacker and flare the dome at the hit direction. The
+     * RESISTANCE from casting already handles the damage reduction, so we never cancel the hit here.
+     */
+    public static void wardStruck(ServerPlayerEntity victim, LivingEntity attacker) {
+        attacker.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 30, 6, false, false));
+        attacker.setVelocity(0, Math.min(0, attacker.getVelocity().y), 0); // root pulse
+        attacker.velocityModified = true;
+        Vec3d dir = attacker.getPos().subtract(victim.getPos());
+        dir = dir.lengthSquared() < 0.01 ? new Vec3d(0, 0, 1) : dir.normalize();
+        HSNet.sendWardImpact(victim, dir);
+        victim.getServerWorld().playSound(null, victim.getX(), victim.getY(), victim.getZ(),
+                SoundEvents.BLOCK_CONDUIT_ACTIVATE, SoundCategory.PLAYERS, 0.5f, 1.8f);
     }
 
     // ---------------- 4: Gravity Snare ----------------

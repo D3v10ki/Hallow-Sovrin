@@ -55,6 +55,9 @@ public class HollowSovereignClient implements ClientModInitializer {
             context.register(com.hollowsovereign.client.render.VoidDiscRenderer.SHADER_ID,
                     net.minecraft.client.render.VertexFormats.POSITION_COLOR_TEXTURE,
                     com.hollowsovereign.client.render.VoidDiscRenderer::setProgram);
+            context.register(com.hollowsovereign.client.render.VoidWardRenderer.SHADER_ID,
+                    net.minecraft.client.render.VertexFormats.POSITION_COLOR_TEXTURE,
+                    com.hollowsovereign.client.render.VoidWardRenderer::setProgram);
         });
         // Draw after the world's translucent pass: starfield wall backdrop first, then floor, then
         // the black-hole core (opaque, writes depth) before the disc so the core occludes the disc.
@@ -69,6 +72,12 @@ public class HollowSovereignClient implements ClientModInitializer {
         // Teleport / dash afterimage ghosts render in the entity pass (translucent player models).
         net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents.AFTER_ENTITIES.register(
                 com.hollowsovereign.client.render.VoidGhostRenderer::render);
+        // Void Ward barrier domes (translucent emissive spheres around warded players).
+        net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents.AFTER_TRANSLUCENT.register(
+                com.hollowsovereign.client.render.VoidWardRenderer::render);
+        // Blink rupture shockwave rings at the departure + arrival points.
+        net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents.AFTER_TRANSLUCENT.register(
+                com.hollowsovereign.client.render.VoidRingRenderer::render);
 
         registerReceivers();
 
@@ -146,15 +155,37 @@ public class HollowSovereignClient implements ClientModInitializer {
             float bodyYaw = buf.readFloat();
             float headYaw = buf.readFloat();
             float pitch = buf.readFloat();
+            float stretch = buf.readFloat();
+            boolean rupture = buf.readBoolean();
             int life = buf.readInt();
-            client.execute(() -> com.hollowsovereign.client.render.VoidGhostRenderer.addTrail(
-                    id, from, to, count, bodyYaw, headYaw, pitch, life));
+            client.execute(() -> {
+                com.hollowsovereign.client.render.VoidGhostRenderer.addTrail(
+                        id, from, to, count, bodyYaw, headYaw, pitch, stretch, life);
+                if (rupture) {  // small void rupture at each end of the blink
+                    com.hollowsovereign.client.render.VoidRingRenderer.addRing(from.add(0, 1.0, 0), 1.6f, 8);
+                    com.hollowsovereign.client.render.VoidRingRenderer.addRing(to.add(0, 1.0, 0), 1.6f, 8);
+                }
+            });
         });
 
         ClientPlayNetworking.registerGlobalReceiver(HSNet.FLOOR_RIPPLE, (client, handler, buf, sender) -> {
             double x = buf.readDouble();
             double z = buf.readDouble();
             client.execute(() -> com.hollowsovereign.client.render.VoidFloorRenderer.rippleNow(x, z));
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(HSNet.WARD_STATE, (client, handler, buf, sender) -> {
+            int id = buf.readInt();
+            int dur = buf.readInt();
+            client.execute(() -> com.hollowsovereign.client.render.VoidWardRenderer.addWard(id, dur));
+        });
+
+        ClientPlayNetworking.registerGlobalReceiver(HSNet.WARD_IMPACT, (client, handler, buf, sender) -> {
+            int id = buf.readInt();
+            float dx = buf.readFloat();
+            float dy = buf.readFloat();
+            float dz = buf.readFloat();
+            client.execute(() -> com.hollowsovereign.client.render.VoidWardRenderer.addImpact(id, dx, dy, dz));
         });
 
     }
