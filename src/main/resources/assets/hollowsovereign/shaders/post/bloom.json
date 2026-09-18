@@ -1,0 +1,63 @@
+{
+	"targets": [
+		"base",
+		"bright",
+		"swap"
+	],
+	"passes": [
+		{
+			"name": "hollowsovereign:hs_copy",
+			"intarget": "minecraft:main",
+			"outtarget": "base"
+		},
+		{
+			"name": "hollowsovereign:hs_extract",
+			"intarget": "base",
+			"outtarget": "bright"
+		},
+		{
+			"name": "hollowsovereign:hs_blur",
+			"intarget": "bright",
+			"outtarget": "swap",
+			"uniforms": [
+				{ "name": "BlurDir", "values": [ 1.0, 0.0 ] },
+				{ "name": "Radius", "values": [ 8.0 ] }
+			]
+		},
+		{
+			"name": "hollowsovereign:hs_blur",
+			"intarget": "swap",
+			"outtarget": "bright",
+			"uniforms": [
+				{ "name": "BlurDir", "values": [ 0.0, 1.0 ] },
+				{ "name": "Radius", "values": [ 8.0 ] }
+			]
+		},
+		{
+			"name": "hollowsovereign:hs_blur",
+			"intarget": "bright",
+			"outtarget": "swap",
+			"uniforms": [
+				{ "name": "BlurDir", "values": [ 1.0, 0.0 ] },
+				{ "name": "Radius", "values": [ 8.0 ] }
+			]
+		},
+		{
+			"name": "hollowsovereign:hs_blur",
+			"intarget": "swap",
+			"outtarget": "bright",
+			"uniforms": [
+				{ "name": "BlurDir", "values": [ 0.0, 1.0 ] },
+				{ "name": "Radius", "values": [ 8.0 ] }
+			]
+		},
+		{
+			"name": "hollowsovereign:hs_composite",
+			"intarget": "base",
+			"outtarget": "minecraft:main",
+			"auxtargets": [
+				{ "name": "BloomSampler", "id": "bright" }
+			]
+		}
+	]
+}

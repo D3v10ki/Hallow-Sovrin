@@ -1,0 +1,15 @@
+{
+	"required": true,
+	"package": "com.hollowsovereign.mixin",
+	"compatibilityLevel": "JAVA_17",
+	"mixins": [
+		"PlayerEntityMixin",
+		"ServerPlayerEntityMixin"
+	],
+	"client": [
+		"client.BackgroundRendererMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

@@ -1,0 +1,42 @@
+{
+	"schemaVersion": 1,
+	"id": "hollowsovereign",
+	"version": "${version}",
+	"name": "Hollow Sovereign",
+	"description": "A co-op, anime-style boss-rush mod. Pick one of four sorcerer classes, level a skill tree, parry and combo through cursed-spirit hordes, and take down cinematic bosses.",
+	"authors": [
+		"Charlie Reading"
+	],
+	"contact": {
+		"homepage": "https://modrinth.com/mod/hollow-sovereign",
+		"sources": "https://github.com/"
+	},
+	"license": "ARR",
+	"icon": "assets/hollowsovereign/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.hollowsovereign.HollowSovereign"
+		],
+		"client": [
+			"com.hollowsovereign.client.HollowSovereignClient"
+		],
+		"modmenu": [
+			"com.hollowsovereign.client.HSModMenu"
+		]
+	},
+	"mixins": [
+		"hollowsovereign.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.15.0",
+		"minecraft": "~1.20.1",
+		"java": ">=17",
+		"fabric-api": "*",
+		"geckolib": ">=4.8"
+	},
+	"suggests": {
+		"modmenu": "*",
+		"satin": ">=1.14.0"
+	}
+}
